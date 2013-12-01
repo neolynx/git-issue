@@ -32,7 +32,10 @@ class Tessera(object):
             if line:
                 a = re.split(r'[ \t]+', line)
                 if len(a) != 2:
-                    print "invalid status line: %s"%line
+                    colorful.out.bold_red("Error in %s: invalid status line: %s" % (status_file, line))
+                    break
+                if not colorful.exists(a[1]):
+                    colorful.out.bold_red("Error in %s: color %s does not exist" % (status_file, a[1]))
                     break
                 Tessera._status.append( ( a[0], a[1] ) )
         f.close()
@@ -51,7 +54,10 @@ class Tessera(object):
             if line:
                 a = re.split(r'[ \t]+', line)
                 if len(a) != 2:
-                    print "invalid te_types line: %s"%line
+                    colorful.out.bold_red("Error in %s: invalid te_types line: %s" % (types_file, line))
+                    break
+                if not colorful.exists(a[1]):
+                    colorful.out.bold_red("Error in %s: color %s does not exist" % (types_file, a[1]))
                     break
                 Tessera._te_types.append( ( a[0], a[1] ) )
         f.close()
