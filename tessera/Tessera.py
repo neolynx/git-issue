@@ -109,9 +109,8 @@ class Tessera(object):
         else:
             status = "no status available"
         if color:
-            if hasattr(colorful, color):
-                f = getattr(colorful, color)
-                status = f(self.status)
+            if colorful.exists(color):
+                status = colorful.get(color)(self.status)
 
         color = None
         if Tessera._te_types:
@@ -123,9 +122,8 @@ class Tessera(object):
         else:
             te_type = "no type available"
         if color:
-            if hasattr(colorful, color):
-                f = getattr(colorful, color)
-                title = f(title)
+            if colorful.exists(color):
+                title = colorful.get(color)(title)
 
         return "%s %s %s %s %s %s"%(self.get_ident_short(), title, " " * (40 - len_title), status, " " * (10 - len_status), te_type)
 
