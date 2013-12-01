@@ -108,7 +108,6 @@ class Tessera(object):
 
         if not self.title:
             self.title = "no title"
-
         self.status_id = -1
         if not self.status:
             self.status = "no status"
