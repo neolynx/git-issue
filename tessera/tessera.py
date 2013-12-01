@@ -94,15 +94,15 @@ class Tessera(object):
                 i += 1
 
             if self.title and self.status and self.te_type:
-              break
+                break
             count = range(len(self.body))
 
         if not self.title:
-          self.title = "no title"
+            self.title = "no title"
         if not self.status:
-          self.status = "no status"
+            self.status = "no status"
         if not self.te_type:
-          self.te_type = "no te_type"
+            self.te_type = "no te_type"
 
     def summary(self):
         len_title = len(self.title)
