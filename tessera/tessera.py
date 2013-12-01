@@ -78,7 +78,6 @@ class Tessera(object):
     def _parse(self):
         self.title = None
         self.status = None
-        count = range(len(self.body))
         i = 0
         while i < len(self.body):
             if self.body[i].startswith("# "):
@@ -95,7 +94,6 @@ class Tessera(object):
 
             if self.title and self.status and self.te_type:
                 break
-            count = range(len(self.body))
 
         if not self.title:
             self.title = "no title"
