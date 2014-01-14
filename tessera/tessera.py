@@ -75,7 +75,7 @@ class Tessera(object):
     def _parse(self):
         self._attributes["tags"] = set()
         self.content = []
-        title_pattern = re.compile("^# (?P<title>.*)$")
+        title_pattern = re.compile("^#\s*(?P<title>.*)$")
         status_pattern = re.compile("^@status (?P<status>.*)$")
         type_pattern = re.compile("^@type (?P<type>.*)$")
         tags_pattern = re.compile("^@tags (?P<tags>.*)$")
