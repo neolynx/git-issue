@@ -4,3 +4,6 @@
 @tags git
 
 require user to stash changes if dirty
+
+Or even better: automatically stash the changes and stash
+them back again when finished operation.

@@ -2,8 +2,9 @@
 
 import os
 import stat
+import re
 from subprocess import Popen
-from sys import stdin, stdout, stderr
+from sys import stdin, stdout
 import types
 import shutil
 
@@ -14,90 +15,178 @@ from tesseraconfig import TesseraConfig
 from exceptions import TesseraError, ArgumentError
 
 
+class TRepository:
+    def __init__(self, git_tessera):
+        self.GitTessera = git_tessera
+
+    def find(self, args):
+
+        refspec = ""
+        ls_args = []
+        while args:
+            arg = args.pop()
+
+            if arg == "-":
+                refspec = "-"
+                continue
+
+            m = re.match("-(\d+)", arg)
+            if m is not None:
+                refspec = m.group(1)
+                continue
+
+            ls_args.append(arg)
+
+        results = self.GitTessera.ls(ls_args)
+        if refspec == "-":
+            return [results[0]]
+
+        if re.match("^\d+$", refspec):
+            return [results[int(refspec)]]
+
+        if refspec != "":
+            ret = []
+            for t in results:
+                if t.tessera_hash.startswidth(refspec):
+                    ret.append(t)
+
+            return ret
+        return results
+
+
 class GitCommands(object):
 
     def __init__(self):
         git_directory = "."
         self.git = MyGit(git_directory)
-        Tessera._tesserae = os.path.relpath(os.path.join(git_directory, ".tesserae"))
+        Tessera._tesserae = os.path.relpath(os.path.join(
+            git_directory, ".tesserae"))
         self._config = TesseraConfig(os.path.join(Tessera._tesserae, "config"))
 
+    def cmd_help(self, args):
+        """ git tessera
+
+            manage your project issues within your git reporitory
+
+            commands:
+        """
+        if len(args) > 0:
+            function = self.__getattribute__("cmd_" + args[0])
+            print function.__doc__
+            return
+        print self.cmd_help.__doc__
+        for cmd in dir(self):
+            if cmd.startswith("cmd_"):
+                print "    {0}      {1}".format(cmd[4:], cmd.__doc__)
+
     def cmd_init(self, args):
+        """ git tessera init
+
+            initialises tessera in an existing git repository
+        """
         if len(args) != 0:
             raise ArgumentError("git tessera init takes no arguments")
 
         if os.path.exists(Tessera._tesserae):
-            raise TesseraError("git tesserae directory already exists: %s" % Tessera._tesserae)
+            raise TesseraError("git tesserae directory already exists: %s"
+                               % Tessera._tesserae)
 
         os.mkdir(Tessera._tesserae)
 
         files = []
-        for source in [ "template", "config" ]:
+        for source in ["template", "config"]:
             files.append(_install(Tessera._tesserae, source))
 
         self.git.add(files, "tessera: initialized")
         return True
 
     def cmd_ls(self, args):
+        """ git tessera ls
+
+            list available tesseraes in current git repository
+
+            git tessera ls -
+                list the last entry
+
+            git tessera ls -2
+                list the second last entry
+
+            git tessera ls - -e
+                edit the listed (last) entry
+
+            git tessera ls -2 -e
+                edit the second last entry
+        """
+
+        if "-e" in args:
+            args.remove("-e")
+            return self.cmd_edit(args)
+
         gt = GitTessera(self._config)
-        tesserae = gt.ls(args)
+        tr = TRepository(gt)
+        tesserae = tr.find(args)
+
         for t in tesserae:
             print t.summary()
         return True
 
     def cmd_show(self, args):
         if len(args) != 1:
-            raise ArgumentError("git tessera show takes identifier as argument")
+            raise ArgumentError(
+                "git tessera show takes identifier as argument")
 
         gt = GitTessera(self._config)
-        t = gt.get(args[0])
-        if not t:
+        gr = TRepository(gt)
+        ts = gr.find(args)
+        if not ts:
             return False
 
-        short = t.summary()
-        length = len(short)
-        print "=" * length
-        print short
-        print "=" * length
-        print t.content
+        for t in ts:
+            short = t.summary()
+            length = len(short)
+            print "=" * length
+            print short
+            print "=" * length
+            print t.content
         return True
 
     def cmd_edit(self, args):
+        """ git tessera edit <refspec>
+
+            opens a existing tessera identified by <refspec> in editor
+            for modifying it. automatically add the modifications
+            as a commit to the repository.
+
+            <refspec> may be:
+                '-' for the last entry
+                '-1' for the second last entry
+                '-2' for the thirt last entry
+                <SHA1> the SHA1 id of the tessera
+        """
         if len(args) < 1:
-            raise ArgumentError("git tessera edit takes one or more identifier as argument")
+            raise ArgumentError(
+                "git tessera edit takes one or more identifier as argument")
 
-        tessera_paths = []
-        for key in args:
-            tessera_path = None
-            found = False
-            for i in os.listdir(Tessera._tesserae):
-                tessera_path = "%s/%s" % (Tessera._tesserae, i)
-                if not stat.S_ISDIR(os.lstat(tessera_path).st_mode):
-                    continue
-                if i.split('-')[0] == key or i == key:
-                    found = True
-                    break
-            if not found:
-                raise TesseraError("git tessera %s not found" % key)
-
-            tessera_paths.append(tessera_path)
+        gt = GitTessera(self._config)
+        gr = TRepository(gt)
+        tesserae = gr.find(args)
 
         while True:
-            tessera_files = ["%s/tessera" % x for x in tessera_paths]
+            tessera_files = ["%s" % x.filename for x in tesserae]
             _edit(tessera_files, self._config)
 
             # if self.git.is_dirty():
             failed = []
-            while tessera_paths:
-                tessera_path = tessera_paths.pop()
-                t = Tessera(tessera_path, self._config)
+            while tesserae:
+                t = tesserae.pop()
                 if not t.error:
                     t._write_info()
-                    files = [ "%s/tessera" % tessera_path, "%s/info" % tessera_path ]
-                    self.git.add( files, "tessera updated: %s" % t.get_attribute("title"))
+                    files = [t.filename, t.infofile]
+                    self.git.add(files, "tessera updated: %s"
+                                 % t.get_attribute("title"))
                     continue
                 # failed parsing
-                failed.append(tessera_path)
+                failed.append(t)
 
             if failed:
                 stdout.write("Abort ? [y/N] ")
@@ -107,7 +196,8 @@ class GitCommands(object):
                     break
                 if answer and answer.lower() == "y":
                     break
-                tessera_paths = failed
+                # FIXME: what shall that line do?
+                #  tessera_paths = failed
             else:
                 break
 
@@ -136,7 +226,8 @@ class GitCommands(object):
 
     def cmd_remove(self, args):
         if len(args) != 1:
-            raise ArgumentError("git tessera remove takes identifier as argument")
+            raise ArgumentError(
+                "git tessera remove takes identifier as argument")
 
         key = args[0]
         tessera_file = None
@@ -235,6 +326,7 @@ def _edit(files, config):
             p = Popen([editor] + files)
     p.communicate()
     return p.wait()
+
 
 def _install(tesserae_path, source):
     """ Installs the file named {source} from config directory of tessera into

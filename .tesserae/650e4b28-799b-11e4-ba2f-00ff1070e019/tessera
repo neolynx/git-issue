@@ -1,0 +1,13 @@
+# better commit message on changed tessera
+@status new
+@type todo
+// @tags
+
+If you change an tessera, you get a pretty commit message
+in your log showing you which tessera was changed.
+
+However, it would be nice to extract the status info from the file
+and add it to the commit message like:
+
+"tessera updated: XZ, status: new"
+
